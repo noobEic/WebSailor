@@ -60,11 +60,11 @@ class MultiTurnReactAgent(FnCallAgent):
                     return content
             except Exception as e:
                 if attempt == (max_tries - 1):
-                    print(f"SGLang server error {e}")
-                    return f"SGLang server error"
+                    print(f"vLLM server error {e}")
+                    return f"vLLM server error"
                 continue
         
-        return "SGLang server empty response"
+        return "vLLM server empty response"
 
     def count_tokens(self, messages, model="gpt-4o"):
         try: 

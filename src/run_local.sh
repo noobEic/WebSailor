@@ -15,9 +15,9 @@ apt update
 apt install tmux -y
 pip install nvitop
 
-echo "==== Starting Summary Model vLLM Server (Port 6002)... ===="
-CUDA_VISIBLE_DEVICES=0,1 python -m sglang.launch_server \
-    --model-path $SUMMARY_MODEL_PATH --host 0.0.0.0 --tp 4 --port 6002 &
+echo "==== Starting Original Model vLLM Server (Port 6001)... ===="
+CUDA_VISIBLE_DEVICES=0,1 python -m vllm.serve \
+    --model-path $SUMMARY_MODEL_PATH --host 0.0.0.0 --tp 4 --port 6001 &
 
 SUMMARY_SERVER_PID=$!
 
@@ -26,25 +26,20 @@ start_time=$(date +%s)
 server2_ready=false
 
 while true; do
-    # Check Summary Model
-    if ! $server2_ready && curl -s http://localhost:6002/v1/chat/completions > /dev/null; then
-        echo -e "\nSummary model (port 6002) is ready!"
-        server2_ready=true
+    # Check Local Model
+    if ! $server1_ready && curl -s http://localhost:6001/v1/chat/completions > /dev/null; then
+        echo -e "\nLocal model (port 6001) is ready!"
+        server1_ready=true
     fi
     
-    # If both servers are ready, exit loop
-    if $server2_ready; then
-        echo "Both servers are ready for inference!"
-        break
-    fi
     
     # Check if timeout
     current_time=$(date +%s)
     elapsed=$((current_time - start_time))
     if [ $elapsed -gt $timeout ]; then
         echo -e "\nWarning: Server startup timeout after ${timeout} seconds"
-        if ! $server2_ready; then
-            echo "Second server (port 6002) failed to start"
+        if ! $server1_ready; then
+            echo "vLLM server (port 6001) failed to start"
         fi
         break
     fi
@@ -52,14 +47,9 @@ while true; do
     sleep 10
 done
 
-if $server2_ready; then
-    echo "Proceeding with both servers..."
+if $server1_ready; then
+    echo "Proceeding with the server..."
 else
-    echo "Proceeding with available servers..."
-fi
-
-
-
 
 
 
@@ -75,16 +65,16 @@ export SPECIAL_CODE_MODE=false
 
 export MAX_WORKERS=20
 
-python -u run_multi_react.py --dataset "$DATASET" --output "$OUTPUT_PATH" --max_workers $MAX_WORKERS --model $MODEL_PATH --temperature $TEMPERATURE 
+python -u run_multi_react_api.py --dataset "$DATASET" --output "$OUTPUT_PATH" --max_workers $MAX_WORKERS --model $MODEL_PATH --temperature $TEMPERATURE 
 
 
 #####################################
 ### 4. Start evaluation          ####
 #####################################
 
-SUMMARY_PATH="${OUTPUT_PATH}/${DATASET}_summary.jsonl"
+SUMMARY_PATH="${OUTPUT_PATH}/${DATASET}_summary_api.jsonl"
 export MODEL_NAME=$(basename ${MODEL_PATH}) 
-PREDICTION_PATH="${OUTPUT_PATH}/${MODEL_NAME}_sglang/${DATASET}"
+PREDICTION_PATH="${OUTPUT_PATH}/${MODEL_NAME}_vllm/${DATASET}"
 
 echo "Evaluating predictions in $PREDICTION_PATH"
 python evaluate.py --input_folder ${PREDICTION_PATH} --restore_result_path ${SUMMARY_PATH} --dataset ${DATASET}
