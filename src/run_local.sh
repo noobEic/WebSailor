@@ -15,9 +15,9 @@ apt update
 apt install tmux -y
 pip install nvitop
 
+
 echo "==== Starting Original Model vLLM Server (Port 6001)... ===="
-CUDA_VISIBLE_DEVICES=0,1 python -m vllm.serve \
-    --model-path $SUMMARY_MODEL_PATH --host 0.0.0.0 --tp 4 --port 6001 &
+CUDA_VISIBLE_DEVICES=0,1 vllm serve $MODEL_PATH --host 0.0.0.0 --tensor-parallel-size 4 --port 6001 &
 
 SUMMARY_SERVER_PID=$!
 

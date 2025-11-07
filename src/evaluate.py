@@ -6,6 +6,7 @@ import concurrent
 from tqdm import tqdm 
 import re 
 from prompt import JUDGE_PROMPT_GAIA, JUDGE_PROMPT_BC, JUDGE_PROMPT_QA
+from api_keys import *
 import traceback
 from openai import OpenAI
 import tiktoken
@@ -28,13 +29,9 @@ def call_llm_judge(item):
 
         prompt = judge_prompt.format(question=question, correct_answer=correct_answer, response=response)
 
-        openai_api_key = "EMPTY"
-        openai_api_base = "http://127.0.0.1:6002/v1"
-
-        client = OpenAI(
-            api_key=openai_api_key,
-            base_url=openai_api_base,
-        )
+        from zhipuai import ZhipuAI
+        client = ZhipuAI(api_key=ZHIPUAI_API_KEY)
+        
         max_tries = 10
         for attempt in range(max_tries):
             try:
