@@ -6,8 +6,7 @@ import requests
 from qwen_agent.tools.base import BaseTool, register_tool
 import os
 
-SEARCH_API_URL = os.getenv("SEARCH_API_URL")
-GOOGLE_SEARCH_KEY = os.getenv("GOOGLE_SEARCH_KEY")
+from api_keys import *
 
 
 @register_tool("search", allow_overwrite=True)
@@ -29,7 +28,7 @@ class Search(BaseTool):
     }
 
     def google_search(self, query: str):
-        url = 'https://google.serper.dev/search'
+        url = 'https://serpapi.com/search'
         headers = {
             'X-API-KEY': GOOGLE_SEARCH_KEY,
             'Content-Type': 'application/json',
@@ -85,19 +84,69 @@ class Search(BaseTool):
         except:
             return f"No results found for '{query}'. Try with a more general query, or remove the year filter."
 
+    def zhipu_search(self, query: str):
+        from zai import ZhipuAiClient
+        client = ZhipuAiClient(api_key=ZHIPUAI_API_KEY)
+        
+        for i in range(5):
+            try:
+                response = client.web_search.web_search(
+                    search_engine="search_std",
+                    search_query=query,
+                    search_intent=False,
+                    count=10,
+                    content_size="high"
+                )
+                results = response
+                
+            except Exception as e:
+                print(e)
+                if i == 4:
+                    return f"Zhipu search Timeout, return None, Please try again later."
+
+
+        if hasattr(results, 'error') and results.error is not None:
+            raise Exception(f"Error: {results.error.code} - {results.error.message}")
+
+        try:
+            web_snippets = list()
+            idx = 0
+            for page in results.search_result:
+                
+                page = page.to_dict()
+                idx += 1
+                
+                date_published = "\nDate published: " + page["publish_date"]
+
+                source = "\nSource: " + page["link"]
+
+                snippet = "\n" + page["content"]   
+
+                redacted_version = f"{idx}. [{page['title']}]({page['link']}){date_published}{source}\n{snippet}"
+
+                redacted_version = redacted_version.replace("Your browser can't play this video.", "")
+                web_snippets.append(redacted_version)
+
+            content = f"A Zhipu search for '{query}' found {len(web_snippets)} results:\n\n## Web Results\n" + "\n\n".join(web_snippets)
+            return content
+        except Exception as e:
+            print(e)
+            return f"No results found for '{query}'. Try with a more general query, or remove the year filter."
 
     def call(self, params: Union[str, dict], **kwargs) -> str:
-        assert GOOGLE_SEARCH_KEY is not None, "Please set the GOOGLE_SEARCH_KEY environment variable."
+        # assert GOOGLE_SEARCH_KEY is not None, "Please set the GOOGLE_SEARCH_KEY environment variable."
+        assert ZHIPUAI_API_KEY is not None, "Please set the ZHIPUAI_API_KEY environment variable."
         try:
             query = params["query"]
         except:
             return "[Search] Invalid request format: Input must be a JSON object containing 'query' field"
         
         if isinstance(query, str):
-            response = self.google_search(query)
+            #response = self.google_search(query)
+            response = self.zhipu_search(query)
         else:
             assert isinstance(query, List)
             with ThreadPoolExecutor(max_workers=3) as executor:
-                response = list(executor.map(self.google_search, query))
+                response = list(executor.map(self.zhipu_search, query))
             response = "\n=======\n".join(response)
         return response

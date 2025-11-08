@@ -29,14 +29,14 @@ def call_llm_judge(item):
 
         prompt = judge_prompt.format(question=question, correct_answer=correct_answer, response=response)
 
-        from zhipuai import ZhipuAI
-        client = ZhipuAI(api_key=ZHIPUAI_API_KEY)
+        from zai import ZhipuAiClient
+        client = ZhipuAiClient(api_key=ZHIPUAI_API_KEY)
         
         max_tries = 10
         for attempt in range(max_tries):
             try:
                 chat_response = client.chat.completions.create(
-                                    model='qwen2.5-72b-instruct',
+                                    model='glm-4.5-flash',
                                     messages=[{"role": "user", "content": prompt}],
                 )    
                 response = chat_response.choices[0].message.content
@@ -254,18 +254,27 @@ def main():
     print(f"Using {dataset} judge prompt ...")
 
     round1_file, round2_file, round3_file = os.path.join(args.input_folder, "iter1.jsonl"), os.path.join(args.input_folder, "iter2.jsonl"), os.path.join(args.input_folder, "iter3.jsonl") 
-    for file in [round1_file, round2_file, round3_file]:
+    for file in [round1_file]:
         assert os.path.exists(file), f"Prediction {file} not found, three  rounds are required "
-     
+        
+    # for file in [round1_file, round2_file, round3_file]:
+       # assert os.path.exists(file), f"Prediction {file} not found, three  rounds are required "
+    
     round_items = {
         "round1": process_single_round(round1_file),
-        "round2": process_single_round(round2_file),
-        "round3": process_single_round(round3_file)
+        "round2": process_single_round(round1_file),
+        "round3": process_single_round(round1_file)
     }
+
+    # round_items = {
+    #     "round1": process_single_round(round1_file),
+    #     "round2": process_single_round(round2_file),
+    #     "round3": process_single_round(round3_file)
+    # }
 
     round_results = {} 
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:  
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:  
         for round_name, items in round_items.items():
             futures = {executor.submit(call_llm_judge, item): item for item in items} 
             round_results[round_name] = [] 

@@ -11,7 +11,7 @@ from qwen_agent.llm.schema import DEFAULT_SYSTEM_MESSAGE, Message
 from qwen_agent.settings import MAX_LLM_CALL_PER_RUN
 from qwen_agent.tools import BaseTool
 
-
+import time
 MAX_LLM_CALL_PER_RUN = int(os.getenv('MAX_LLM_CALL_PER_RUN', 40))
 MAX_TOKEN_LENGTH = int(os.getenv('MAX_LENGTH', 31 * 1024 - 500))
 
@@ -39,7 +39,7 @@ class MultiTurnReactAgent(FnCallAgent):
     def call_server(self, msgs, max_tries=10):
         # Set OpenAI API key and base URL using vLLM API server
         openai_api_key = "EMPTY"
-        openai_api_base = "http://127.0.0.1:6001/v1"
+        openai_api_base = "http://127.0.0.1:8000/v1"
 
         client = OpenAI(
             api_key=openai_api_key,
@@ -89,12 +89,29 @@ class MultiTurnReactAgent(FnCallAgent):
         self.user_prompt = user_prompt
         self.user_prompt = self.user_prompt + question
         messages = [{"role": "system", "content": self.system_message}, {"role": "user", "content": self.user_prompt}]
+        
+        timing_records = {
+            "llm_calls": [],
+            "tool_calls": [],
+            "final_answer_generation_time": 0
+        }
+        
         num_llm_calls_available = MAX_LLM_CALL_PER_RUN
         round = 0
         while num_llm_calls_available > 0:
             round += 1
             num_llm_calls_available -= 1
+            
+            
+            start_llm = time.time()
             content = self.call_server(messages)
+            end_llm = time.time()
+            llm_duration = end_llm - start_llm
+            timing_records["llm_calls"].append({
+                "round": round, 
+                "duration": llm_duration
+            })
+            
             print(f'Round {round}: {content}')
             if '<tool_response>' in content:
                 pos = content.find('<tool_response>')
@@ -106,12 +123,27 @@ class MultiTurnReactAgent(FnCallAgent):
                     tool_call = json.loads(tool_call)
                     tool_name = tool_call.get('name', '')
                     tool_args = tool_call.get('arguments', {})
+                    
+                    
+                    
+                    start_tool = time.time()
                     result = self._call_tool(tool_name, tool_args)
+                    end_tool = time.time()
+                    tool_duration = end_tool - start_tool
+                    timing_records["tool_calls"].append({
+                        "round": round, 
+                        "tool_name": tool_name,
+                        "duration": tool_duration
+                    })
+                    
+                    
+                    
                 except:
                     result = 'Error: Tool call is not a valid JSON. Tool call must contain a valid "name" and "arguments" field.'
                 result = "<tool_response>\n" + result + "\n</tool_response>"
                 messages.append({"role": "user", "content": result})
             if '<answer>' in content and '</answer>' in content:
+                timing_records['final_answer_generation_time'] = llm_duration
                 termination = 'answer'
                 break
             if num_llm_calls_available <= 0 and '<answer>' not in content:
@@ -125,7 +157,18 @@ class MultiTurnReactAgent(FnCallAgent):
                 print(f"Token count exceeds limit: {token_count} > {max_tokens}")
                 
                 messages[-1]['content'] = "You have now reached the maximum context length you can handle. You should stop making tool calls and, based on all the information above, think again and provide what you consider the most likely answer in the following format:<think>your final thinking</think>\n<answer>your answer</answer>"
+                
+                
+                
+                start_llm_final = time.time()
                 content = self.call_server(messages)
+                end_llm_final = time.time()
+                final_llm_duration = end_llm_final - start_llm_final
+                timing_records['final_answer_generation_time'] = final_llm_duration
+                
+                
+                
+                
                 messages.append({"role": "assistant", "content": content.strip()})
                 if '<answer>' in content and '</answer>' in content:
                     prediction = messages[-1]['content'].split('<answer>')[1].split('</answer>')[0]
@@ -139,7 +182,8 @@ class MultiTurnReactAgent(FnCallAgent):
                     "rollout_id": data['rollout_id'],
                     "messages": messages,
                     "prediction": prediction,
-                    "termination": termination
+                    "termination": termination,
+                    "timing_records": timing_records
                 }
                 return result
 
@@ -157,6 +201,7 @@ class MultiTurnReactAgent(FnCallAgent):
             "rollout_id": data['rollout_id'],
             "messages": messages,
             "prediction": prediction,
-            "termination": termination
+            "termination": termination,
+            "timing_records": timing_records
         }
         return result

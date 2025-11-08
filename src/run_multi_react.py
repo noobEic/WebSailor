@@ -11,6 +11,7 @@ from tool_search import *
 from tool_visit import * 
 
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default="")
@@ -25,7 +26,7 @@ if __name__ == "__main__":
                                                                         "hle", "kuan_graph"])
     parser.add_argument("--temperature", type=float, default=0.6)
     parser.add_argument("--top_p", type=float, default=0.95)
-    parser.add_argument("--max_workers", type=int, default=20)
+    parser.add_argument("--max_workers", type=int, default=5)
     parser.add_argument("--sys_prompt", type=str, default="SYSTEM_PROMPT_MULTI")
     parser.add_argument("--roll_out_count", type=int, default=3)
     args = parser.parse_args()
@@ -38,7 +39,7 @@ if __name__ == "__main__":
     model_name = os.path.basename(model.rstrip('/'))
     
     # Create output directory structure: output_base/model_name_sglang/dataset_name/
-    model_dir = os.path.join(output_base, f"{model_name}_sglang")
+    model_dir = os.path.join(output_base, f"{model_name}_vllm")
     dataset_dir = os.path.join(model_dir, args.dataset)
     
     # Create directories

@@ -8,13 +8,14 @@ import os
 from openai import OpenAI
 import random
 
+from api_keys import *
 
 WEBCONTENT_MAXLENGTH = int(os.getenv("WEBCONTENT_MAXLENGTH", 150000))
 IGNORE_JINA = os.getenv("IGNORE_JINA", "false").lower() == "true"
 # Visit Tool (Using Jina Reader)
 JINA_READER_URL_PREFIX = "https://r.jina.ai/"
 
-JINA_API_KEY = os.getenv("JINA_API_KEY")
+#JINA_API_KEY = os.getenv("JINA_API_KEY")
 
 
 @register_tool('visit', allow_overwrite=True)
@@ -68,21 +69,27 @@ class Visit(BaseTool):
     
     def call_server(self, msgs, max_tries=10):
         # 设置 OpenAI 的 API 密钥和 API 基础 URL 使用 vLLM 的 API 服务器。
-        openai_api_key = "EMPTY"
-        openai_api_base = "http://127.0.0.1:6002/v1"
+        from zai import ZhipuAiClient
+        
+        client = ZhipuAiClient(api_key=ZHIPUAI_API_KEY)
 
-        client = OpenAI(
-            api_key=openai_api_key,
-            base_url=openai_api_base,
-        )
         for attempt in range(max_tries):
             try:
+                # chat_response = client.chat.completions.create(
+                #     model='/path/qwen2.5-instruct-72b',
+                #     messages=msgs,
+                #     stop=["\n<tool_response>", "<tool_response>"],
+                #     temperature=0.7
+                # )
+                
                 chat_response = client.chat.completions.create(
-                    model='/path/qwen2.5-instruct-72b',
+                    model="qwen2.5-instruct-72b",
                     messages=msgs,
-                    stop=["\n<tool_response>", "<tool_response>"],
+                    stop=["<tool_response>"],
                     temperature=0.7
                 )
+                
+                
                 content = chat_response.choices[0].message.content
                 if content:
                     try:
