@@ -11,7 +11,7 @@ from qwen_agent.llm.schema import DEFAULT_SYSTEM_MESSAGE, Message
 from qwen_agent.settings import MAX_LLM_CALL_PER_RUN
 from qwen_agent.tools import BaseTool
 
-
+from api_keys import *
 MAX_LLM_CALL_PER_RUN = int(os.getenv('MAX_LLM_CALL_PER_RUN', 40))
 MAX_TOKEN_LENGTH = int(os.getenv('MAX_LENGTH', 31 * 1024 - 500))
 
@@ -38,8 +38,8 @@ class MultiTurnReactAgent(FnCallAgent):
 
     def call_server(self, msgs, max_tries=10):
         # Set OpenAI API key and base URL using vLLM API server
-        openai_api_key = "EMPTY"
-        openai_api_base = "http://127.0.0.1:6001/v1"
+        openai_api_key = OPENAI_API_KEY
+        openai_api_base = OPENAI_API_BASE
 
         client = OpenAI(
             api_key=openai_api_key,
