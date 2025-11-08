@@ -38,6 +38,10 @@ class MultiTurnReactAgent(FnCallAgent):
 
     def call_server(self, msgs, max_tries=10):
         # Set OpenAI API key and base URL using vLLM API server
+        
+        # openai_api_key = OPENAI_API_KEY
+        # openai_api_base = OPENAI_API_BASE
+        
         openai_api_key = "EMPTY"
         openai_api_base = "http://127.0.0.1:8000/v1"
 
@@ -66,6 +70,11 @@ class MultiTurnReactAgent(FnCallAgent):
         
         return "vllm server empty response"
 
+    def count_string_tokens(self, text: str) -> int:
+        if not text:
+            return 0
+        return len(tiktoken.encoding_for_model("gpt-4o").encode(text))
+    
     def count_tokens(self, messages, model="gpt-4o"):
         try: 
             tokenizer = AutoTokenizer.from_pretrained(self.llm_local_path) 
@@ -102,15 +111,19 @@ class MultiTurnReactAgent(FnCallAgent):
             round += 1
             num_llm_calls_available -= 1
             
-            
+            input_tokens = self.count_tokens(messages)
             start_llm = time.time()
             content = self.call_server(messages)
             end_llm = time.time()
             llm_duration = end_llm - start_llm
+            output_tokens = self.count_string_tokens(content)
             timing_records["llm_calls"].append({
                 "round": round, 
-                "duration": llm_duration
+                "duration": llm_duration,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens
             })
+            
             
             print(f'Round {round}: {content}')
             if '<tool_response>' in content:
@@ -125,16 +138,20 @@ class MultiTurnReactAgent(FnCallAgent):
                     tool_args = tool_call.get('arguments', {})
                     
                     
-                    
+                    input_tokens = self.count_tokens(messages)
                     start_tool = time.time()
                     result = self._call_tool(tool_name, tool_args)
                     end_tool = time.time()
                     tool_duration = end_tool - start_tool
+                    output_tokens = self.count_string_tokens(result)
                     timing_records["tool_calls"].append({
                         "round": round, 
                         "tool_name": tool_name,
-                        "duration": tool_duration
+                        "duration": tool_duration,
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens
                     })
+                    
                     
                     
                     
