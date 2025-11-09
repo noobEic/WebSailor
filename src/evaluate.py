@@ -237,7 +237,7 @@ def main():
                                                                         "simple_qa", "simple_qa_small",
                                                                         "time_qa",
                                                                         "xbench-deepsearch",
-                                                                        "hle"])
+                                                                        "hle","exp_10"])
     args = parser.parse_args()
     
     dataset = args.dataset  
@@ -249,6 +249,9 @@ def main():
         judge_prompt = JUDGE_PROMPT_BC
     elif dataset.endswith("qa") or dataset.endswith("qa_small"): # for simple_qa and time_qa
         judge_prompt = JUDGE_PROMPT_QA
+    
+    elif dataset.startswith("exp_10"):
+        judge_prompt = JUDGE_PROMPT_BC
     else:
         judge_prompt = JUDGE_PROMPT_GAIA 
     print(f"Using {dataset} judge prompt ...")

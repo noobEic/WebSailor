@@ -35,7 +35,7 @@ class Search(BaseTool):
         }
         data = {
             "q": query,
-            "num": 10,
+            "num": 3,
             "extendParams": {
                 "country": "en",
                 "page": 1,

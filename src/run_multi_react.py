@@ -23,7 +23,8 @@ if __name__ == "__main__":
                                                                         "simple_qa", "simple_qa_small",
                                                                         "time_qa",
                                                                         "xbench-deepsearch",
-                                                                        "hle", "kuan_graph"])
+                                                                        "hle", "kuan_graph",
+                                                                        "exp_10"])
     parser.add_argument("--temperature", type=float, default=0.6)
     parser.add_argument("--top_p", type=float, default=0.95)
     parser.add_argument("--max_workers", type=int, default=5)
