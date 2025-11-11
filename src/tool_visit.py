@@ -142,7 +142,93 @@ class Visit(BaseTool):
                 
         return "[visit] Failed to read page."
 
+    def crawl4ai_readpage(self, url: str) -> str:
+        from crawl4ai import AsyncWebCrawler
+        import asyncio
+        async def run_crawl():
+            async with AsyncWebCrawler() as crawler:
+                result = await crawler.arun(url)
+                if result :
+                    return result
+                return None
 
+        try:
+            webpage_content = asyncio.run(run_crawl())
+            
+            if webpage_content is not None:
+                return webpage_content
+            else:
+                print(f"crawl4ai: No text content extracted from {url}")
+                return "[visit] Failed to read page."
+
+        except Exception as e:
+            print(f"crawl4ai exception while reading {url}: {e}")
+            return "[visit] Failed to read page."
+    
+    def playwright_readpage(self, url: str) -> str:
+        from playwright.async_api import async_playwright, TimeoutError
+        import asyncio
+
+        async def run_crawl():
+            """异步函数：执行 Playwright 浏览器操作和内容提取"""
+            browser = None
+            try:
+                # 启动 Playwright
+                async with async_playwright() as p:
+                    # 启动 Chromium 浏览器
+                    browser = await p.chromium.launch()
+                    page = await browser.new_page()
+
+                    # 访问 URL，等待 DOM 加载完成
+                    await page.goto(
+                        url, 
+                        wait_until="domcontentloaded",
+                        timeout=60000 
+                    )
+
+                    # --- 关键：正文内容提取逻辑 ---
+                    # 1. 尝试使用强大的选择器定位主要内容 (如文章、博客)
+                    for selector in ["main", "article", "body"]:
+                        locator = page.locator(selector).first
+                        
+                        # 检查元素是否存在且可见，并尝试提取文本
+                        if await locator.is_visible(timeout=500):
+                            content = await locator.inner_text()
+                            
+                            # 确保提取的内容有意义，而不是空的导航栏
+                            if len(content.strip()) > 100:
+                                return content # 成功提取正文，返回文本
+
+                    # 2. 如果启发式失败，回退到获取整个 Body 的可见文本
+                    return await page.locator("body").inner_text()
+                    
+            except TimeoutError:
+                return f"[Playwright Error] 导航超时 (60s)."
+            except Exception as e:
+                # 捕获其他 Playwright 异常
+                return f"[Playwright Exception] {e}"
+            finally:
+                if browser:
+                    await browser.close()
+                    
+        # --- 同步执行区域 ---
+        try:
+            # 使用 asyncio.run 运行异步爬取函数
+            webpage_content = asyncio.run(run_crawl())
+            
+            if webpage_content and not webpage_content.startswith("[Playwright"):
+                # 如果内容存在且不是错误信息，则返回清理后的文本
+                return webpage_content.strip()
+            else:
+                # 如果是 Playwright 错误信息或提取内容为空
+                print(f"Playwright: Failed to extract content for {url}. Result: {webpage_content}")
+                return "[visit] Failed to read page."
+
+        except Exception as e:
+            # 捕获 asyncio.run 自身的错误
+            print(f"asyncio exception while reading {url}: {e}")
+            return "[visit] Failed to read page."
+        
     def readpage(self, url: str, goal: str) -> str:
         """
         Attempt to read webpage content by alternating between jina and aidata services.
@@ -157,7 +243,8 @@ class Visit(BaseTool):
         max_attempts = 10
         for attempt in range(max_attempts):
             # Alternate between jina and aidata
-            content = self.jina_readpage(url)
+            #content = self.jina_readpage(url)
+            content = self.crawl4ai_readpage(url)
             sevice = "jina"
 
             # Check if we got valid content

@@ -95,7 +95,7 @@ class Search(BaseTool):
                     search_query=query,
                     search_intent=False,
                     count=10,
-                    content_size="high"
+                    content_size="medium"
                 )
                 results = response
                 
@@ -121,6 +121,7 @@ class Search(BaseTool):
                 source = "\nSource: " + page["link"]
 
                 snippet = "\n" + page["content"]   
+                # snippet = "\n" + page["content"][:500] + "..." if len(page["content"]) > 500 else "\n" + page["content"]
 
                 redacted_version = f"{idx}. [{page['title']}]({page['link']}){date_published}{source}\n{snippet}"
 
