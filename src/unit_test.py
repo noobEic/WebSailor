@@ -21,8 +21,10 @@ class Test(unittest.TestCase):
     def test_visit(self):
         visitor = Visit()
         urls = [
-            "http://mp.weixin.qq.com/s?__biz=MzIwNDY1NzAzMQ==&mid=2247497474&idx=1&sn=b7abcf59cafcd3b99f43e174346c357b",
-        ]
+            #"https://www.xiaohongshu.com/explore",
+            "http://web.archive.org/web/20250929201011/https://www.xiaohongshu.com/explore"
+            #"http://archive.org/wayback/available?url=https://www.xiaohongshu.com/explore"
+            ]
         for url in urls:
             content = visitor.jina_readpage(url)
             self.assertIsNotNone(content)
