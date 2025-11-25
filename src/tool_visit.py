@@ -244,7 +244,7 @@ class Visit(BaseTool):
         for attempt in range(max_attempts):
             # Alternate between jina and aidata
             #content = self.jina_readpage(url)
-            content = self.crawl4ai_readpage(url)
+            content = self.jina_readpage(url)
             sevice = "jina"
 
             # Check if we got valid content

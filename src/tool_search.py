@@ -94,7 +94,7 @@ class Search(BaseTool):
                     search_engine="search_std",
                     search_query=query,
                     search_intent=False,
-                    count=10,
+                    count=3,
                     content_size="medium"
                 )
                 results = response

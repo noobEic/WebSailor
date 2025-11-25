@@ -10,12 +10,26 @@ from qwen_agent.llm import BaseChatModel
 from qwen_agent.llm.schema import DEFAULT_SYSTEM_MESSAGE, Message
 from qwen_agent.settings import MAX_LLM_CALL_PER_RUN
 from qwen_agent.tools import BaseTool
-
+from sentence_transformers import SentenceTransformer
+import torch
+import sentence_transformers
 import time
 MAX_LLM_CALL_PER_RUN = int(os.getenv('MAX_LLM_CALL_PER_RUN', 40))
 MAX_TOKEN_LENGTH = int(os.getenv('MAX_LENGTH', 31 * 1024 - 500))
 
 print(f'Running with MAX_LLM_CALL_PER_RUN = {MAX_LLM_CALL_PER_RUN}')
+
+def calculate_similarity(previous,current,model,method="emb_model"):
+    if method == "emb_model":
+        embeddings = model.encode(
+            [previous, current], 
+            convert_to_tensor=True, 
+            show_progress_bar=False
+        )
+        sim_matrix = sentence_transformers.util.cos_sim(embeddings[0], embeddings[1])
+        similarity = float(sim_matrix[0][0])
+        return similarity
+
 
 class MultiTurnReactAgent(FnCallAgent):
     def __init__(self,
@@ -107,6 +121,13 @@ class MultiTurnReactAgent(FnCallAgent):
         
         num_llm_calls_available = MAX_LLM_CALL_PER_RUN
         round = 0
+
+        previous_thought = ""
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
+
+
         while num_llm_calls_available > 0:
             round += 1
             num_llm_calls_available -= 1
@@ -117,14 +138,50 @@ class MultiTurnReactAgent(FnCallAgent):
             end_llm = time.time()
             llm_duration = end_llm - start_llm
             output_tokens = self.count_string_tokens(content)
+
+            current_thought = content.strip()
+            
+            if '<tool_call>' in current_thought:
+                current_thought = current_thought.split('<tool_call>')[0].strip()
+            if '<answer>' in current_thought:
+                current_thought = current_thought.split('<answer>')[0].strip()
+            if '<think>' in current_thought and '</think>' in current_thought:
+                try:
+                    current_thought = current_thought.split('<think>')[1].split('</think>')[0].strip()
+                except IndexError:
+                    pass
+            
+            similarity = 0.0
+            if previous_thought:
+                similarity = calculate_similarity(previous_thought,current_thought,model)
+
+            if similarity > 0.9:
+                print(f"警告: 思考相似度 {similarity:.4f} 超过阈值。强制重新思考。")
+                
+                # 构建"重新思考"的提示
+                rethink_prompt = (
+                    "你之前的思考和上一步过于相似。请换个思路，"
+                    "探索其他可能性，或者尝试不同的方法。不要重复。"
+                )
+                
+                # 将提示作为 'user' 消息添加，以便模型在下一轮响应
+                messages.append({"role": "user", "content": rethink_prompt})
+                
+                # 跳过本轮的 (坏的) content 追加和工具调用
+                continue
+
             timing_records["llm_calls"].append({
                 "round": round, 
                 "duration": llm_duration,
                 "input_tokens": input_tokens,
-                "output_tokens": output_tokens
+                "output_tokens": output_tokens,
+                "previous": previous_thought,
+                "current": current_thought,
+                "similarity": similarity
             })
             
-            
+            previous_thought = current_thought
+
             print(f'Round {round}: {content}')
             if '<tool_response>' in content:
                 pos = content.find('<tool_response>')
